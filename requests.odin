@@ -1,48 +1,34 @@
 package opm_cli
-
+import "./external/http"
+import "core:encoding/json"
 import "./external/http/client"
 import "core:fmt"
 
-get :: proc(url: string) -> (response: client.Response, err: client.Error) {
+get_json :: proc(url: string, $T: typeid) -> (response: client.Response, err: client.Error) {
 	response, err = client.get(url)
 	if err != nil {
 		fmt.printf("Request failed: %s", err)
 		return
 	}
-	// defer client.response_destroy(&res)
 
-	// fmt.printf("Status: %s\n", res.status)
-	// fmt.printf("Headers: %v\n", res.headers)
-	// fmt.printf("Cookies: %v\n", res.cookies)
-	// body, alloc_occurred, berr := client.response_body(&res)
-	// if berr != nil {
-	// 	fmt.printf("Error retrieving response body: %s", berr)
-	// 	return
-	// }
-	// defer client.body_destroy(body, alloc_occurred)
-
-	// fmt.println(body)
 	return
 }
 // todo: use a proper URI?
 // todo: how to append auth-tokens etc
-post :: proc(url: string, json: any) -> (response: client.Response, err: client.Error) {
+post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, err: client.Error) {
 	req: client.Request
 	client.request_init(&req, .Post)
 	defer client.request_destroy(&req)
-
-	if err := client.with_json(&req, json); err != nil {
+	if err := client.with_json(&req, request_json); err != nil {
 		fmt.printf("JSON error: %s", err)
 		return
 	}
-	req.headers["method"] = "POST"
-	// fmt.println(string(req.body.buf[:]))
-	// fmt.println(req)
+	res, er := client.request(url, &req);assert(er != nil)
+	defer client.response_destroy(&res)
 
-	response, err = client.request(url, &req)
-	if err != nil {
-		fmt.printf("Request failed: %s", err)
-		return
-	}
+	bodyRes, allocated, berr := client.response_body(&res)
+	body := bodyRes.(http.Body_Plain)
+	um_err := json.unmarshal_string(body, &ret);assert(um_err == nil)
+	client.body_destroy(bodyRes, allocated)
 	return
 }
