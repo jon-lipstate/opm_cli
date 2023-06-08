@@ -1,0 +1,13 @@
+{
+	version: "0.0.1-alpha",
+	authors: ["jon-lipstate"],
+	description: "A CLI tool for uploading odin packages to the OPM Registry",
+	url: "https://github.com/jon-lipstate/opm_cli",
+	readme: "readme.md",
+	license: "BSD-3",
+	keywords:["OPM"],
+	dependencies: {
+//		abc: "1.2.3",
+//		def: "4.5.6",
+	}
+}
