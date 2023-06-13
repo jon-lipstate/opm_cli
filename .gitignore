@@ -1,3 +1,5 @@
+.vscode
 *.bin
 ols.json
 opm_cli
+ENV.odin

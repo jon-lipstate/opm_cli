@@ -8,27 +8,29 @@ import "core:strings"
 import "core:os"
 
 main :: proc() {
-	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, context.allocator)
-	context.allocator = mem.tracking_allocator(&track)
-	_main()
-	for _, leak in track.allocation_map do fmt.printf("%v leaked %v bytes\n", leak.location, leak.size)
-	for bad_free in track.bad_free_array do fmt.printf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory)
+	when true {
+		_main()
+	} else {
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		context.allocator = mem.tracking_allocator(&track)
+		_main()
+		for _, leak in track.allocation_map do fmt.printf("%v leaked %v bytes\n", leak.location, leak.size)
+		for bad_free in track.bad_free_array do fmt.printf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory)
+	}
 }
-TEST_TOKEN :: "iNe9bK5fCQonvkjKKP6tUkkE76BqB3w"
 
 _main :: proc() {
 	// NOTE: https seems borked
-	url := "localhost:5173/api/packages/upsert"
+	url := "localhost:5173/api/packages"
 
 	u, uok := get_user_pkg()
-	if true do return
 	hash, ok := get_current_commit_hash()
 	userData := UserPkg {
 		url = "https://github.com/jon-lipstate/opm_cli",
 		readme = "readme.md",
 		description = "A CLI tool for uploading odin packages to the OPM Registry",
-		version = "0.0.1-alpha",
+		version = "0.0.2-alpha",
 		license = "BSD-3 Clause",
 		keywords = []string{"CLI", "OPM"},
 		dependencies = nil,
@@ -46,7 +48,7 @@ _main :: proc() {
 		readme_contents = string(readme),
 	}
 	res, err := post_json(url, pkg, int)
-	fmt.println(res)
+	fmt.println("POST-RESULT", res, err)
 
 }
 UserPkg :: struct {
@@ -56,7 +58,7 @@ UserPkg :: struct {
 	version:      string,
 	license:      string,
 	keywords:     []string,
-	authors:      []string,
+	authors:      []string, // not currently used
 	dependencies: []Dependency,
 }
 Dependency :: struct {

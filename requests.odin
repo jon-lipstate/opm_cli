@@ -26,9 +26,14 @@ post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, err: c
 	defer client.response_destroy(&res)
 
 	bodyRes, allocated, berr := client.response_body(&res)
-	body := bodyRes.(http.Body_Plain)
-	fmt.println(res.status, body)
-	um_err := json.unmarshal_string(body, &ret);assert(um_err == nil)
-	client.body_destroy(bodyRes, allocated)
+	body, ok := bodyRes.(http.Body_Plain)
+	if ok {
+		fmt.println(res.status, body)
+		um_err := json.unmarshal_string(body, &ret);assert(um_err == nil)
+		client.body_destroy(bodyRes, allocated)
+	} else {
+		fmt.println("BODY_RES", bodyRes)
+	}
+
 	return
 }
