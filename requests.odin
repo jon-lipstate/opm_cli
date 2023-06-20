@@ -24,15 +24,16 @@ post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, err: c
 	}
 	res, er := client.request(url, &req);assert(er == nil)
 	defer client.response_destroy(&res)
+	fmt.println(res.status) // Note: DB uses upsert, Created is also Update
 
 	bodyRes, allocated, berr := client.response_body(&res)
 	body, ok := bodyRes.(http.Body_Plain)
 	if ok {
-		fmt.println(res.status, body)
-		um_err := json.unmarshal_string(body, &ret);assert(um_err == nil)
+		um_err := json.unmarshal_string(body, &ret)
+		// if um_err != nil {fmt.println(um_err)} // todo: fix error handling
 		client.body_destroy(bodyRes, allocated)
 	} else {
-		fmt.println("BODY_RES", bodyRes)
+		fmt.println("!ok - BODY_RES", bodyRes)
 	}
 
 	return

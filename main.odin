@@ -6,6 +6,8 @@ import "core:mem"
 import "core:fmt"
 import "core:strings"
 import "core:os"
+import "core:path/filepath"
+import "core:c/libc"
 
 main :: proc() {
 	when true {
@@ -24,34 +26,38 @@ _main :: proc() {
 	// NOTE: https seems borked for submodule
 	url := "localhost:5173/api/packages"
 	backing := strings.builder_make()
-	u, uok := get_user_pkg(&backing)
-	hash, ok := get_current_commit_hash()
-	fmt.println("Version after scope:", u.version)
-	fmt.println(strings.to_string(backing))
-	// userData := UserPkg {
-	// 	url = "https://github.com/jon-lipstate/opm_cli",
-	// 	readme = "readme.md",
-	// 	description = "A CLI tool for uploading odin packages to the OPM Registry",
-	// 	version = "0.0.2-alpha",
-	// 	license = "BSD-3 Clause",
-	// 	keywords = []string{"CLI", "OPM"},
-	// 	dependencies = nil,
-	// }
-	// readme, rok := os.read_entire_file(userData.readme)
-	// defer delete(readme)
-	// // version, vok := get_odin_version()
 
-	// pkg := ModPkg {
-	// 	token           = TEST_TOKEN,
-	// 	userData        = userData,
-	// 	size_kb         = 42,
-	// 	compiler        = "dev-2023-06",
-	// 	commit_hash     = hash,
-	// 	readme_contents = string(readme),
-	// }
-	// res, err := post_json(url, pkg, int)
-	// fmt.println("POST-RESULT", res, err)
+	userData, uok := get_user_pkg(&backing)
+	if !uok {panic("Package File has errors.")}
 
+	hash, hok := get_current_commit_hash()
+	if !hok {panic("Unable to get commit hash, did you init git?")}
+
+	readme, rok := os.read_entire_file(userData.readme);defer delete(readme)
+	if !rok {panic("Expected readme in main folder. if it is in another directory, include the relative path, eg `a_folder/the_readme.md`")}
+
+	version, vok := get_odin_version()
+	ctoken := libc.getenv("OPM_TOKEN") // does this allocate? prob not?
+	opm_token := strings.clone_from_cstring(cstring(ctoken));defer delete(opm_token)
+
+	total_size := 0
+	filepath.walk("./", odin_size_walker, rawptr(&total_size))
+	total_size /= 1024
+
+	compiler, cok := get_odin_version()
+	if !cok {panic("Could not locate compiler, verify `odin version` returns the compiler version.")}
+
+
+	pkg := ModPkg {
+		token           = opm_token,
+		userData        = userData,
+		size_kb         = total_size,
+		compiler        = compiler,
+		commit_hash     = hash,
+		readme_contents = string(readme),
+	}
+
+	post_json(url, pkg, int)
 }
 UserPkg :: struct {
 	url:          string,
@@ -69,7 +75,7 @@ Dependency :: struct {
 }
 ModPkg :: struct {
 	userData:        UserPkg,
-	token:           string,
+	token:           string, // user's secret token
 	size_kb:         int,
 	compiler:        string,
 	commit_hash:     string,
@@ -101,19 +107,18 @@ get_current_commit_hash :: proc() -> (hash: string, ok: bool) {
 	ok = true
 	return
 }
-
+// Assumed Package File: `mod.pkg`
 get_user_pkg :: proc(backing: ^strings.Builder) -> (pkg: UserPkg, ok: bool) {
 	data := os.read_entire_file("./mod.pkg") or_return
 	defer delete(data)
 	v, e := json.parse(data)
 	defer json.destroy_value(v)
 	main_obj := v.(json.Object)
-	version, vok := main_obj["version"].(json.String)
-	fmt.println("From json5 parse", version)
-	if vok {pkg.version = clone_to_backing(backing, version)}
-	fmt.println("Cloned to backing", pkg.version)
 	description, dok := main_obj["description"].(json.String)
 	if dok {pkg.description = clone_to_backing(backing, description)}
+
+	version, vok := main_obj["version"].(json.String)
+	if vok {pkg.version = clone_to_backing(backing, version)}
 
 	url, uok := main_obj["url"].(json.String)
 	if uok {pkg.url = clone_to_backing(backing, url)}
@@ -172,12 +177,38 @@ get_user_pkg :: proc(backing: ^strings.Builder) -> (pkg: UserPkg, ok: bool) {
 	return
 }
 
+when ODIN_OS == .Windows {
+	foreign import lc "system:libucrt.lib"
+} else when ODIN_OS == .Darwin {
+	foreign import lc "system:System.framework"
+} else {
+	foreign import lc "system:c"
+}
+@(default_calling_convention = "c")
+foreign lc {
+	popen :: proc(command: cstring, mode: cstring) -> ^libc.FILE ---
+	pclose :: proc(stream: ^libc.FILE) -> int ---
+}
+/*
+Invariant Assumption: String format is exactly as follows: `odin version dev-2023-06:c1fb8eaf`
+*/
 get_odin_version :: proc() -> (version: string, ok: bool) {
-	// command := cstring("odin version")
-	fmt.println("odin version - needs process package to work")
-	version = "todo"
-	ok = true
-
+	buf: [64]u8
+	vstr: string = "Invalid"
+	file := popen(cstring("odin version"), cstring("r"))
+	if file != nil {
+		cstr := libc.fgets(cast(^byte)&buf[0], len(buf), file)
+		vstr = strings.clone_from_cstring(cstring(cstr))
+		pclose(file)
+		ok = true
+	} else {
+		fmt.println("Failed to run command.")
+		return
+	}
+	space_split := strings.split(vstr, " ");defer delete(space_split)
+	compiler_long := space_split[len(space_split) - 1]
+	colon_split := strings.split(compiler_long, ":");defer delete(colon_split)
+	version = colon_split[0]
 	return
 }
 
@@ -185,6 +216,25 @@ clone_to_backing :: proc(b: ^strings.Builder, s: string) -> string {
 	start := len(b.buf)
 	length := strings.write_string(b, s)
 	str := string(b.buf[start:start + length])
-	// fmt.println("cloned", str, start, start + length)
 	return str
+}
+
+// NOTE: Skips Dependency Directory: `external` (SUBJECT TO CHANGE)
+odin_size_walker :: proc(
+	info: os.File_Info,
+	in_err: os.Errno,
+	user_data: rawptr,
+) -> (
+	err: os.Errno = 0,
+	skip_dir: bool = false,
+) {
+	if info.is_dir && info.name == "external" {
+		skip_dir = true
+		return
+	}
+	total_size := cast(^int)user_data
+	if !info.is_dir && strings.has_suffix(info.name, ".odin") {
+		total_size^ += int(info.size)
+	}
+	return
 }
