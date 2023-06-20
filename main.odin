@@ -21,34 +21,36 @@ main :: proc() {
 }
 
 _main :: proc() {
-	// NOTE: https seems borked
+	// NOTE: https seems borked for submodule
 	url := "localhost:5173/api/packages"
-
-	u, uok := get_user_pkg()
+	backing := strings.builder_make()
+	u, uok := get_user_pkg(&backing)
 	hash, ok := get_current_commit_hash()
-	userData := UserPkg {
-		url = "https://github.com/jon-lipstate/opm_cli",
-		readme = "readme.md",
-		description = "A CLI tool for uploading odin packages to the OPM Registry",
-		version = "0.0.2-alpha",
-		license = "BSD-3 Clause",
-		keywords = []string{"CLI", "OPM"},
-		dependencies = nil,
-	}
-	readme, rok := os.read_entire_file(userData.readme)
-	defer delete(readme)
-	// version, vok := get_odin_version()
+	fmt.println("Version after scope:", u.version)
+	fmt.println(strings.to_string(backing))
+	// userData := UserPkg {
+	// 	url = "https://github.com/jon-lipstate/opm_cli",
+	// 	readme = "readme.md",
+	// 	description = "A CLI tool for uploading odin packages to the OPM Registry",
+	// 	version = "0.0.2-alpha",
+	// 	license = "BSD-3 Clause",
+	// 	keywords = []string{"CLI", "OPM"},
+	// 	dependencies = nil,
+	// }
+	// readme, rok := os.read_entire_file(userData.readme)
+	// defer delete(readme)
+	// // version, vok := get_odin_version()
 
-	pkg := ModPkg {
-		token           = TEST_TOKEN,
-		userData        = userData,
-		size_kb         = 42,
-		compiler        = "dev-2023-06",
-		commit_hash     = hash,
-		readme_contents = string(readme),
-	}
-	res, err := post_json(url, pkg, int)
-	fmt.println("POST-RESULT", res, err)
+	// pkg := ModPkg {
+	// 	token           = TEST_TOKEN,
+	// 	userData        = userData,
+	// 	size_kb         = 42,
+	// 	compiler        = "dev-2023-06",
+	// 	commit_hash     = hash,
+	// 	readme_contents = string(readme),
+	// }
+	// res, err := post_json(url, pkg, int)
+	// fmt.println("POST-RESULT", res, err)
 
 }
 UserPkg :: struct {
@@ -100,19 +102,30 @@ get_current_commit_hash :: proc() -> (hash: string, ok: bool) {
 	return
 }
 
-get_user_pkg :: proc() -> (pkg: UserPkg, ok: bool) {
+get_user_pkg :: proc(backing: ^strings.Builder) -> (pkg: UserPkg, ok: bool) {
 	data := os.read_entire_file("./mod.pkg") or_return
 	defer delete(data)
 	v, e := json.parse(data)
 	defer json.destroy_value(v)
 	main_obj := v.(json.Object)
 	version, vok := main_obj["version"].(json.String)
-	authorsArr, aok := main_obj["authors"].(json.Array)
+	fmt.println("From json5 parse", version)
+	if vok {pkg.version = clone_to_backing(backing, version)}
+	fmt.println("Cloned to backing", pkg.version)
 	description, dok := main_obj["description"].(json.String)
+	if dok {pkg.description = clone_to_backing(backing, description)}
+
 	url, uok := main_obj["url"].(json.String)
+	if uok {pkg.url = clone_to_backing(backing, url)}
 	license, lok := main_obj["license"].(json.String)
+	if lok {pkg.license = clone_to_backing(backing, license)}
+	readme, rok := main_obj["readme"].(json.String)
+	if rok {pkg.readme = clone_to_backing(backing, readme)}
+
+	authorsArr, aok := main_obj["authors"].(json.Array)
 	keywordsArr, kok := main_obj["keywords"].(json.Array)
 	dependenciesMap, dpok := main_obj["dependencies"].(json.Object)
+
 	ws :: strings.write_string
 	errors := strings.builder_make();defer delete(errors.buf)
 	if !vok do ws(&errors, "'version' is a required field (string).\n")
@@ -125,14 +138,14 @@ get_user_pkg :: proc() -> (pkg: UserPkg, ok: bool) {
 	if kok {
 		pkg.authors = make([]string, len(authorsArr))
 		for value, i in authorsArr {
-			v := value.(json.String)
+			v := clone_to_backing(backing, value.(json.String))
 			pkg.authors[i] = v
 		}
 	}
 	if kok {
 		pkg.keywords = make([]string, len(keywordsArr))
 		for value, i in keywordsArr {
-			v := value.(json.String)
+			v := clone_to_backing(backing, value.(json.String))
 			pkg.keywords[i] = v
 		}
 	}
@@ -140,7 +153,7 @@ get_user_pkg :: proc() -> (pkg: UserPkg, ok: bool) {
 		pkg.dependencies = make([]Dependency, len(dependenciesMap))
 		i := 0
 		for p, value in dependenciesMap {
-			v := value.(json.String)
+			v := clone_to_backing(backing, value.(json.String))
 			pkg.dependencies[i] = {p, v}
 			i += 1
 		}
@@ -155,7 +168,6 @@ get_user_pkg :: proc() -> (pkg: UserPkg, ok: bool) {
 
 	} else {
 		ok = true
-		// todo: update values, clone everything?
 	}
 	return
 }
@@ -167,4 +179,12 @@ get_odin_version :: proc() -> (version: string, ok: bool) {
 	ok = true
 
 	return
+}
+
+clone_to_backing :: proc(b: ^strings.Builder, s: string) -> string {
+	start := len(b.buf)
+	length := strings.write_string(b, s)
+	str := string(b.buf[start:start + length])
+	// fmt.println("cloned", str, start, start + length)
+	return str
 }
