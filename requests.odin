@@ -14,7 +14,7 @@ get_json :: proc(url: string, $T: typeid) -> (response: client.Response, err: cl
 }
 // todo: use a proper URI?
 // todo: how to append auth-tokens etc
-post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, err: client.Error) {
+post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, code: http.Status) {
 	req: client.Request
 	client.request_init(&req, .Post)
 	defer client.request_destroy(&req)
@@ -24,13 +24,15 @@ post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, err: c
 	}
 	res, er := client.request(url, &req);assert(er == nil)
 	defer client.response_destroy(&res)
-	fmt.println(res.status) // Note: DB uses upsert, Created is also Update
 
 	bodyRes, allocated, berr := client.response_body(&res)
 	body, ok := bodyRes.(http.Body_Plain)
+	code = res.status
 	if ok {
 		um_err := json.unmarshal_string(body, &ret)
-		// if um_err != nil {fmt.println(um_err)} // todo: fix error handling
+		if um_err != nil {
+			fmt.println("failed to parse body", body)
+		}
 		client.body_destroy(bodyRes, allocated)
 	} else {
 		fmt.println("!ok - BODY_RES", bodyRes)
