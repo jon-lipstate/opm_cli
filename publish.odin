@@ -42,7 +42,7 @@ publish :: proc() {
 	} else {
 		url := "https://pkg-odin.org/api/packages"
 	}
-	backing := strings.builder_make()
+	backing := [dynamic]u8{}
 
 	userData, uok := get_user_pkg(&backing)
 	if !uok {panic("Package File has errors.")}
@@ -76,7 +76,10 @@ publish :: proc() {
 		commit_hash     = hash,
 		readme_contents = string(readme),
 	}
-
+	when ODIN_DEBUG {
+		fmt.println("SUBMITTING JSON:")
+		fmt.printf("%#v\n", pkg)
+	}
 	res, code := post_json(url, pkg, PublishResult)
 	fmt.println(code, "-", res.message)
 }
@@ -86,7 +89,7 @@ Invariants:
 - File Has a Trailing Newline
 - Commit Hash is 2nd element,split on spaces
 */
-get_current_commit_hash :: proc(backing: ^strings.Builder) -> (hash: string, ok: bool) {
+get_current_commit_hash :: proc(backing: ^[dynamic]u8) -> (hash: string, ok: bool) {
 	pathArr := []string{os.get_current_directory(), ".git/logs/HEAD"}
 	path := strings.join(pathArr, "/");defer delete(path)
 	data := os.read_entire_file(path) or_return
@@ -110,7 +113,7 @@ get_current_commit_hash :: proc(backing: ^strings.Builder) -> (hash: string, ok:
 	return
 }
 // Assumed Package File: `mod.pkg`
-get_user_pkg :: proc(backing: ^strings.Builder) -> (pkg: UserPkg, ok: bool) {
+get_user_pkg :: proc(backing: ^[dynamic]u8) -> (pkg: UserPkg, ok: bool) {
 	pathArr := []string{os.get_current_directory(), "mod.pkg"}
 	path := strings.join(pathArr, "/");defer delete(path)
 	data := os.read_entire_file(path) or_return
@@ -210,10 +213,12 @@ get_odin_version :: proc() -> (version: string, ok: bool) {
 	return
 }
 
-clone_to_backing :: proc(b: ^strings.Builder, s: string) -> string {
-	start := len(b.buf)
-	length := strings.write_string(b, s)
-	str := string(b.buf[start:start + length])
+clone_to_backing :: proc(b: ^[dynamic]u8, s: string) -> string {
+	start := len(b)
+	sb := transmute([]u8)s
+	length := len(sb)
+	append_elems(b, ..sb) // todo: use something more like resize+memcpy..
+	str := string(b[start:start + length])
 	return str
 }
 
