@@ -1,5 +1,5 @@
 {
-	version: "0.0.5-alpha",
+	version: "0.0.6-alpha",
 	description: "A CLI tool for uploading odin packages to the OPM Registry",
 	url: "https://github.com/jon-lipstate/opm_cli",
 	readme: "readme.md",
