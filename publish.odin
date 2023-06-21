@@ -37,8 +37,8 @@ PublishResult :: struct {
 
 publish :: proc() {
 	// NOTE: https seems unreliable(?)
-	// url := "https://pkg-odin.org/api/packages"
-	url := "localhost:5173/api/packages"
+	url := "https://pkg-odin.org/api/packages"
+	//url := "localhost:5173/api/packages"
 	backing := strings.builder_make()
 
 	userData, uok := get_user_pkg(&backing)
