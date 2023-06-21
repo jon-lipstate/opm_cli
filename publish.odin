@@ -16,7 +16,6 @@ UserPkg :: struct {
 	version:      string,
 	license:      string,
 	keywords:     []string,
-	authors:      []string, // not currently used
 	dependencies: []Dependency,
 }
 Dependency :: struct {
@@ -30,6 +29,7 @@ ModPkg :: struct {
 	compiler:        string,
 	commit_hash:     string,
 	readme_contents: string,
+	//
 }
 PublishResult :: struct {
 	message: string,
@@ -37,20 +37,26 @@ PublishResult :: struct {
 
 publish :: proc() {
 	// NOTE: https seems unreliable(?)
-	url := "https://pkg-odin.org/api/packages"
-	//url := "localhost:5173/api/packages"
+	when ODIN_DEBUG {
+		url := "localhost:5173/api/packages"
+	} else {
+		url := "https://pkg-odin.org/api/packages"
+	}
 	backing := strings.builder_make()
 
 	userData, uok := get_user_pkg(&backing)
 	if !uok {panic("Package File has errors.")}
 
+
 	hash, hok := get_current_commit_hash(&backing)
 	if !hok {panic("Unable to get commit hash, did you init git?")}
 
 	readme, rok := os.read_entire_file(userData.readme);defer delete(readme)
-	if !rok {panic("Expected readme in main folder. if it is in another directory, include the relative path, eg `a_folder/the_readme.md`")}
+	if !rok {panic("Expected readme in main folder. If it is in another directory, include the relative path, eg `a_folder/the_readme.md`. Case-Sensitive per OS.")}
 
 	version, vok := get_odin_version()
+	if !vok {panic("Unable to detect Odin, cant get current compiler version")}
+
 	ctoken := libc.getenv("OPM_TOKEN") // does this allocate? prob not?
 	opm_token := strings.clone_from_cstring(cstring(ctoken));defer delete(opm_token)
 	if len(opm_token) < 10 {panic("No Valid Token Detected")}
@@ -70,7 +76,7 @@ publish :: proc() {
 		commit_hash     = hash,
 		readme_contents = string(readme),
 	}
-	// fmt.printf("%#v", pkg)
+
 	res, code := post_json(url, pkg, PublishResult)
 	fmt.println(code, "-", res.message)
 }
@@ -111,7 +117,9 @@ get_user_pkg :: proc(backing: ^strings.Builder) -> (pkg: UserPkg, ok: bool) {
 	defer delete(data)
 	v, e := json.parse(data)
 	defer json.destroy_value(v)
-	main_obj := v.(json.Object)
+	main_obj, mok := v.(json.Object)
+	if !mok {panic("Invalid JSON5 file format, did you need \" around your deps?")}
+	clone_to_backing(backing, "sacrificial clone - TODO fixme. seems like first clone corrupts")
 	description, dok := main_obj["description"].(json.String)
 	if dok {pkg.description = clone_to_backing(backing, description)}
 
@@ -148,8 +156,9 @@ get_user_pkg :: proc(backing: ^strings.Builder) -> (pkg: UserPkg, ok: bool) {
 		pkg.dependencies = make([]Dependency, len(dependenciesMap))
 		i := 0
 		for p, value in dependenciesMap {
-			v := clone_to_backing(backing, value.(json.String))
-			pkg.dependencies[i] = {p, v}
+			dp := clone_to_backing(backing, p)
+			dv := clone_to_backing(backing, value.(json.String))
+			pkg.dependencies[i] = {dp, dv}
 			i += 1
 		}
 	}
