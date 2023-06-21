@@ -36,7 +36,8 @@ PublishResult :: struct {
 }
 
 publish :: proc() {
-	// NOTE: https seems borked for submodule
+	// NOTE: https seems unreliable(?)
+	// url := "https://pkg-odin.org/api/packages"
 	url := "localhost:5173/api/packages"
 	backing := strings.builder_make()
 
@@ -52,9 +53,10 @@ publish :: proc() {
 	version, vok := get_odin_version()
 	ctoken := libc.getenv("OPM_TOKEN") // does this allocate? prob not?
 	opm_token := strings.clone_from_cstring(cstring(ctoken));defer delete(opm_token)
+	if len(opm_token) < 10 {panic("No Valid Token Detected")}
 
 	total_size := 0
-	filepath.walk("./", odin_size_walker, rawptr(&total_size))
+	filepath.walk(os.get_current_directory(), odin_size_walker, rawptr(&total_size))
 	total_size /= 1024
 
 	compiler, cok := get_odin_version()
@@ -68,7 +70,7 @@ publish :: proc() {
 		commit_hash     = hash,
 		readme_contents = string(readme),
 	}
-
+	// fmt.printf("%#v", pkg)
 	res, code := post_json(url, pkg, PublishResult)
 	fmt.println(code, "-", res.message)
 }
@@ -79,7 +81,9 @@ Invariants:
 - Commit Hash is 2nd element,split on spaces
 */
 get_current_commit_hash :: proc(backing: ^strings.Builder) -> (hash: string, ok: bool) {
-	data := os.read_entire_file("./.git/logs/HEAD") or_return
+	pathArr := []string{os.get_current_directory(), ".git/logs/HEAD"}
+	path := strings.join(pathArr, "/");defer delete(path)
+	data := os.read_entire_file(path) or_return
 	defer delete(data)
 
 	last_line := ""
@@ -101,7 +105,9 @@ get_current_commit_hash :: proc(backing: ^strings.Builder) -> (hash: string, ok:
 }
 // Assumed Package File: `mod.pkg`
 get_user_pkg :: proc(backing: ^strings.Builder) -> (pkg: UserPkg, ok: bool) {
-	data := os.read_entire_file("./mod.pkg") or_return
+	pathArr := []string{os.get_current_directory(), "mod.pkg"}
+	path := strings.join(pathArr, "/");defer delete(path)
+	data := os.read_entire_file(path) or_return
 	defer delete(data)
 	v, e := json.parse(data)
 	defer json.destroy_value(v)
@@ -119,26 +125,18 @@ get_user_pkg :: proc(backing: ^strings.Builder) -> (pkg: UserPkg, ok: bool) {
 	readme, rok := main_obj["readme"].(json.String)
 	if rok {pkg.readme = clone_to_backing(backing, readme)}
 
-	authorsArr, aok := main_obj["authors"].(json.Array)
 	keywordsArr, kok := main_obj["keywords"].(json.Array)
 	dependenciesMap, dpok := main_obj["dependencies"].(json.Object)
 
 	ws :: strings.write_string
 	errors := strings.builder_make();defer delete(errors.buf)
 	if !vok do ws(&errors, "'version' is a required field (string).\n")
-	if !aok do ws(&errors, "'authors' is a required field ([]string).\n")
 	if !dok do ws(&errors, "'description' is a required field (string).\n")
 	if !uok do ws(&errors, "'url' is a required field (string).\n")
 	if !lok do ws(&errors, "'license' is a required field (string).\n")
 	if !kok do ws(&errors, "'keywords' is a required field ([]string).\n")
 	// if !dpok do ws(&errors, "'dependencies' is a required field ({name:version}).\n")
-	if kok {
-		pkg.authors = make([]string, len(authorsArr))
-		for value, i in authorsArr {
-			v := clone_to_backing(backing, value.(json.String))
-			pkg.authors[i] = v
-		}
-	}
+
 	if kok {
 		pkg.keywords = make([]string, len(keywordsArr))
 		for value, i in keywordsArr {

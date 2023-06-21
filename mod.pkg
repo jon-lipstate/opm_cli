@@ -1,6 +1,5 @@
 {
-	version: "0.0.4-alpha",
-	authors: ["jon-lipstate"],
+	version: "0.0.5-alpha",
 	description: "A CLI tool for uploading odin packages to the OPM Registry",
 	url: "https://github.com/jon-lipstate/opm_cli",
 	readme: "readme.md",

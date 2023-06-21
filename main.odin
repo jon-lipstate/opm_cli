@@ -51,9 +51,8 @@ _main :: proc() {
 				lines := strings.split(string(file), "\n");defer delete(lines)
 				for i := 0; i < len(lines); i += 1 {
 					if strings.contains(string(lines[i]), "export OPM_TOKEN") {
-						ll := len(lines[i])
-						if ll > len(token_line) {
-							spaces = strings.repeat(" ", ll - len(token_line))
+						if len(lines[i]) > len(token_line) {
+							spaces = strings.repeat(" ", len(lines[i]) - len(token_line))
 							join := []string{token_line, spaces}
 							token_line_padded := strings.join(join, "")
 							lines[i] = token_line_padded
@@ -61,7 +60,6 @@ _main :: proc() {
 							lines[i] = token_line
 						}
 						replaced_existing = true
-
 						break
 					}
 				}
@@ -73,9 +71,12 @@ _main :: proc() {
 					os.write_string(h, "\n")
 					os.write_string(h, token_line)
 				}
+				if spaces != "" {delete(spaces)}
+				if token_line_padded != "" {delete(token_line_padded)}
+			} else {
+				panic("Feature not implemented for this OS.")
 			}
 		}
 
 	}
-	// publish()
 }
