@@ -25,7 +25,7 @@ Dependency :: struct {
 ModPkg :: struct {
 	userData:        UserPkg,
 	token:           string, // user's secret token
-	size_kb:         int,
+	size_kb:         int, // omits 'external' dir
 	compiler:        string,
 	commit_hash:     string,
 	readme_contents: string,

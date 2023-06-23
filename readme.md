@@ -6,7 +6,9 @@ CLI Tool for Odin package publishing
 
 git submodule dependency to [odin-http](https://github.com/laytan/odin-http)
 
-`git submodule update --init`
+`git submodule update --init --recursive`
+
+Note: odin-http only supports Linux & Mac at present. Windows users must use wsl to get libssl.a as a dep.
 
 Build (`odin build .`) and stash in desired directory, add `opm` to your `PATH`.
 
@@ -25,3 +27,9 @@ Note: `opm publish` performs an upsert on the package, but an insert on the vers
 ## Fetching - Not Impl
 
 Downloading via CLI is not planned at this time. once the web side is stabilized, the feature will be implemented.
+
+## Feature Todo/Wish List
+
+- Produce docs in style of core that will be loaded to the 'signatures' tab for packages
+- Need CURL bindings, ideally rework the http layer around that instead
+- Getting of packages (Held for Curl+discuss structure with gb)
