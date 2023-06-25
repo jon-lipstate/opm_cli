@@ -80,8 +80,15 @@ publish :: proc() {
 		fmt.println("SUBMITTING JSON:")
 		fmt.printf("%#v\n", pkg)
 	}
-	res, code := post_json(url, pkg, PublishResult)
-	fmt.println(code, "-", res.message)
+	when ODIN_OS == .Windows || true {
+		pkg_json, merr := json.marshal(pkg)
+		fmt.println(merr, pkg_json)
+		post_json_curl(url, string(pkg_json))
+	} else {
+		res, code := post_json(url, pkg, PublishResult)
+		fmt.println(code, "-", res.message)
+	}
+
 }
 
 /*
