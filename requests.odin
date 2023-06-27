@@ -7,16 +7,14 @@ import "core:strings"
 import "core:runtime"
 import "core:mem"
 
-// todo: use a proper URI?
-// todo: how to append auth-tokens etc
 post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, code: int) {
 	using curl
 	url_cstr := strings.clone_to_cstring(url);defer delete(url_cstr)
+
 	json_data, merr := json.marshal(request_json);assert(merr == nil)
 	assert(len(json_data) > 0, "NO DATA IN BODY")
 	defer delete(json_data)
-	// json_cstr := strings.clone_to_cstring(json_data);defer delete(json_cstr)
-	fmt.println("json_data", string(json_data))
+
 	h := easy_init();defer easy_cleanup(h)
 
 	headers: ^curl_slist
@@ -32,6 +30,8 @@ post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, code: 
 	easy_setopt(h, CURLoption.POSTFIELDS, &json_data[0])
 	easy_setopt(h, CURLoption.POSTFIELDSIZE, len(json_data))
 
+	easy_setopt(h, CURLoption.SSL_VERIFYPEER, 0)
+
 	easy_setopt(h, CURLoption.WRITEFUNCTION, write_callback)
 	data := DataContext{nil, context}
 	easy_setopt(h, .WRITEDATA, &data)
@@ -40,10 +40,9 @@ post_json :: proc(url: string, request_json: any, $T: typeid) -> (ret: T, code: 
 	if result != CURLcode.OK {
 		fmt.println("Error occurred: ", result)
 	} else {
-		// fmt.println("DATA", string(data.data))
-		fmt.println("OK!")
+		json.unmarshal(data.data, &ret)
+		fmt.println(ret.message)
 	}
-
 	return
 }
 

@@ -1,6 +1,4 @@
 package opm_cli
-// import "./external/http/client"
-// import "./external/http"
 import "core:encoding/json"
 import "core:mem"
 import "core:fmt"
@@ -8,6 +6,10 @@ import "core:strings"
 import "core:os"
 import "core:path/filepath"
 import "core:c/libc"
+
+when ODIN_OS == .Windows {
+	import "./external/command"
+}
 
 UserPkg :: struct {
 	url:          string,
@@ -36,17 +38,16 @@ PublishResult :: struct {
 }
 
 publish :: proc() {
-	// NOTE: https seems unreliable(?)
 	when ODIN_DEBUG {
 		url := "localhost:5173/api/packages"
 	} else {
-		//url := "https://pkg-odin.org/api/packages"
-		url := "https://jsonplaceholder.typicode.com/posts"
-		fmt.println("FIXME - jsonplaceholder URL")
+		url := "https://pkg-odin.org/api/packages"
+		// url := "https://jsonplaceholder.typicode.com/posts"
+		// fmt.println("FIXME - jsonplaceholder URL")
 	}
 	backing := [dynamic]u8{}
-
-	userData, uok := get_user_pkg(&backing)
+	userData: UserPkg = {}
+	uok := get_user_pkg(&backing, &userData)
 	if !uok {panic("Package File has errors.")}
 
 	hash, hok := get_current_commit_hash(&backing)
@@ -79,17 +80,10 @@ publish :: proc() {
 	}
 	when ODIN_DEBUG {
 		fmt.println("SUBMITTING JSON:")
-		fmt.printf("%#v\n", pkg)
+		fmt.printf("%#v\n", pkg.userData)
+		// fmt.println("Backing", string(backing[:]))
 	}
-	when ODIN_OS == .Windows {
-		pkg_json, merr := json.marshal(pkg);defer json.destroy_value(pkg_json)
-		fmt.println(merr, pkg_json)
-		// post_json_curl(url, string(pkg_json))
-	} else {
-		fmt.println("linux/mac")
-		res, code := post_json(url, pkg, PublishResult)
-		fmt.println(code, "-", res.message)
-	}
+	res, code := post_json(url, pkg, PublishResult)
 }
 
 /*
@@ -116,12 +110,12 @@ get_current_commit_hash :: proc(backing: ^[dynamic]u8) -> (hash: string, ok: boo
 	}
 	split_line := strings.split(last_line, " ")
 	if len(split_line) < 2 {ok = false;return}
-	hash = clone_to_backing(backing, split_line[1])
+	hash = strings.clone(split_line[1]) //clone_to_backing(backing, split_line[1])
 	ok = true
 	return
 }
 // Assumed Package File: `mod.pkg`
-get_user_pkg :: proc(backing: ^[dynamic]u8) -> (pkg: UserPkg, ok: bool) {
+get_user_pkg :: proc(backing: ^[dynamic]u8, pkg: ^UserPkg) -> (ok: bool) {
 	pathArr := []string{os.get_current_directory(), "mod.pkg"}
 	path := strings.join(pathArr, "/");defer delete(path)
 	data := os.read_entire_file(path) or_return
@@ -130,19 +124,18 @@ get_user_pkg :: proc(backing: ^[dynamic]u8) -> (pkg: UserPkg, ok: bool) {
 	defer json.destroy_value(v)
 	main_obj, mok := v.(json.Object)
 	if !mok {panic("Invalid JSON5 file format, did you need \" around your deps?")}
-	clone_to_backing(backing, "sacrificial clone - TODO fixme. seems like first clone corrupts")
 	description, dok := main_obj["description"].(json.String)
-	if dok {pkg.description = clone_to_backing(backing, description)}
+	if dok {pkg.description = strings.clone(description)} 	//clone_to_backing(backing, description)}
 
 	version, vok := main_obj["version"].(json.String)
-	if vok {pkg.version = clone_to_backing(backing, version)}
+	if vok {pkg.version = strings.clone(version)} 	//clone_to_backing(backing, version)}
 
 	url, uok := main_obj["url"].(json.String)
-	if uok {pkg.url = clone_to_backing(backing, url)}
+	if uok {pkg.url = strings.clone(url)} 	//clone_to_backing(backing, url)}
 	license, lok := main_obj["license"].(json.String)
-	if lok {pkg.license = clone_to_backing(backing, license)}
+	if lok {pkg.license = strings.clone(license)} 	//clone_to_backing(backing, license)}
 	readme, rok := main_obj["readme"].(json.String)
-	if rok {pkg.readme = clone_to_backing(backing, readme)}
+	if rok {pkg.readme = strings.clone(readme)} 	//clone_to_backing(backing, readme)}
 
 	keywordsArr, kok := main_obj["keywords"].(json.Array)
 	dependenciesMap, dpok := main_obj["dependencies"].(json.Object)
@@ -159,7 +152,7 @@ get_user_pkg :: proc(backing: ^[dynamic]u8) -> (pkg: UserPkg, ok: bool) {
 	if kok {
 		pkg.keywords = make([]string, len(keywordsArr))
 		for value, i in keywordsArr {
-			v := clone_to_backing(backing, value.(json.String))
+			v := strings.clone(value.(json.String)) //clone_to_backing(backing, value.(json.String))
 			pkg.keywords[i] = v
 		}
 	}
@@ -167,8 +160,8 @@ get_user_pkg :: proc(backing: ^[dynamic]u8) -> (pkg: UserPkg, ok: bool) {
 		pkg.dependencies = make([]Dependency, len(dependenciesMap))
 		i := 0
 		for p, value in dependenciesMap {
-			dp := clone_to_backing(backing, p)
-			dv := clone_to_backing(backing, value.(json.String))
+			dp := strings.clone(p) // clone_to_backing(backing, p)
+			dv := strings.clone(value.(json.String)) //clone_to_backing(backing, value.(json.String))
 			pkg.dependencies[i] = {dp, dv}
 			i += 1
 		}
@@ -216,17 +209,21 @@ get_odin_version :: proc() -> (version: string, ok: bool) {
 			pclose(file)
 			ok = true
 		} else {
-			fmt.println("Failed to run command.")
+			fmt.println("Failed to run popen `odin version`")
 			return
 		}
 	} else when ODIN_OS == .Windows {
-		panic("no popen")
+		data, dok := command.cmd("odin version", true, 64)
+		assert(dok, "Failed to call `odin version`")
+		vstr = string(data[:])
+		ok = true
 	}
 
 	space_split := strings.split(vstr, " ");defer delete(space_split)
 	compiler_long := space_split[len(space_split) - 1]
 	colon_split := strings.split(compiler_long, ":");defer delete(colon_split)
 	version = colon_split[0]
+	if ok {delete(vstr)}
 	return
 }
 

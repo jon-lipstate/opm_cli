@@ -6,6 +6,7 @@
 	license: "BSD-3",
 	keywords:["OPM"],
 	dependencies: {
-		"github.com/laytan/odin-http": "0.0.1-beta",
+		"github.com/jon-lipstate/odin-command": "0.0.1",
+		"github.com/jon-lipstate/odin-curl": "0.0.1",
 	}
 }
