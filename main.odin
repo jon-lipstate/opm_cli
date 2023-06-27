@@ -1,17 +1,18 @@
 package opm_cli
-import "./external/http/client"
-import "./external/http"
+
 import "core:encoding/json"
 import "core:mem"
 import "core:fmt"
 import "core:strings"
 import "core:os"
-import "core:os/os2"
+// import "core:os/os2"
 import "core:path/filepath"
 import "core:c/libc"
 
+USE_TRACKING_ALLOCATOR :: false
+
 main :: proc() {
-	when true {
+	when !USE_TRACKING_ALLOCATOR {
 		_main()
 	} else {
 		track: mem.Tracking_Allocator
@@ -24,6 +25,9 @@ main :: proc() {
 }
 
 _main :: proc() {
+	publish()
+	if true do return
+
 	switch len(os.args) {
 	case 1:
 		fmt.println("OPM Commands:")
@@ -77,6 +81,5 @@ _main :: proc() {
 				panic("Feature not implemented for this OS.")
 			}
 		}
-
 	}
 }

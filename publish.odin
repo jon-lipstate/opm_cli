@@ -1,6 +1,6 @@
 package opm_cli
-import "./external/http/client"
-import "./external/http"
+// import "./external/http/client"
+// import "./external/http"
 import "core:encoding/json"
 import "core:mem"
 import "core:fmt"
@@ -40,13 +40,14 @@ publish :: proc() {
 	when ODIN_DEBUG {
 		url := "localhost:5173/api/packages"
 	} else {
-		url := "https://pkg-odin.org/api/packages"
+		//url := "https://pkg-odin.org/api/packages"
+		url := "https://jsonplaceholder.typicode.com/posts"
+		fmt.println("FIXME - jsonplaceholder URL")
 	}
 	backing := [dynamic]u8{}
 
 	userData, uok := get_user_pkg(&backing)
 	if !uok {panic("Package File has errors.")}
-
 
 	hash, hok := get_current_commit_hash(&backing)
 	if !hok {panic("Unable to get commit hash, did you init git?")}
@@ -80,15 +81,15 @@ publish :: proc() {
 		fmt.println("SUBMITTING JSON:")
 		fmt.printf("%#v\n", pkg)
 	}
-	when ODIN_OS == .Windows || true {
-		pkg_json, merr := json.marshal(pkg)
+	when ODIN_OS == .Windows {
+		pkg_json, merr := json.marshal(pkg);defer json.destroy_value(pkg_json)
 		fmt.println(merr, pkg_json)
-		post_json_curl(url, string(pkg_json))
+		// post_json_curl(url, string(pkg_json))
 	} else {
+		fmt.println("linux/mac")
 		res, code := post_json(url, pkg, PublishResult)
 		fmt.println(code, "-", res.message)
 	}
-
 }
 
 /*
@@ -185,17 +186,21 @@ get_user_pkg :: proc(backing: ^[dynamic]u8) -> (pkg: UserPkg, ok: bool) {
 	return
 }
 
-when ODIN_OS == .Windows {
-	foreign import lc "system:libucrt.lib"
-} else when ODIN_OS == .Darwin {
+// when ODIN_OS == .Windows {
+// 	foreign import lc "system:libucrt.lib"
+// }
+
+when ODIN_OS == .Darwin {
 	foreign import lc "system:System.framework"
-} else {
+} else when ODIN_OS == .Linux {
 	foreign import lc "system:c"
 }
-@(default_calling_convention = "c")
-foreign lc {
-	popen :: proc(command: cstring, mode: cstring) -> ^libc.FILE ---
-	pclose :: proc(stream: ^libc.FILE) -> int ---
+when ODIN_OS == .Darwin || ODIN_OS == .Linux {
+	@(default_calling_convention = "c")
+	foreign lc {
+		popen :: proc(command: cstring, mode: cstring) -> ^libc.FILE ---
+		pclose :: proc(stream: ^libc.FILE) -> int ---
+	}
 }
 /*
 Invariant Assumption: String format is exactly as follows: `odin version dev-2023-06:c1fb8eaf`
@@ -203,16 +208,21 @@ Invariant Assumption: String format is exactly as follows: `odin version dev-202
 get_odin_version :: proc() -> (version: string, ok: bool) {
 	buf: [64]u8
 	vstr: string = "Invalid"
-	file := popen(cstring("odin version"), cstring("r"))
-	if file != nil {
-		cstr := libc.fgets(cast(^byte)&buf[0], len(buf), file)
-		vstr = strings.clone_from_cstring(cstring(cstr))
-		pclose(file)
-		ok = true
-	} else {
-		fmt.println("Failed to run command.")
-		return
+	when ODIN_OS == .Linux || ODIN_OS == .Darwin {
+		file := popen(cstring("odin version"), cstring("r"))
+		if file != nil {
+			cstr := libc.fgets(cast(^byte)&buf[0], len(buf), file)
+			vstr = strings.clone_from_cstring(cstring(cstr))
+			pclose(file)
+			ok = true
+		} else {
+			fmt.println("Failed to run command.")
+			return
+		}
+	} else when ODIN_OS == .Windows {
+		panic("no popen")
 	}
+
 	space_split := strings.split(vstr, " ");defer delete(space_split)
 	compiler_long := space_split[len(space_split) - 1]
 	colon_split := strings.split(compiler_long, ":");defer delete(colon_split)
