@@ -1,1 +1,7 @@
 
+[submodule "external/curl"]
+	path = external/curl
+	url = https://github.com/jon-lipstate/odin-curl
+[submodule "external/command"]
+	path = external/command
+	url = https://github.com/jon-lipstate/odin-command
