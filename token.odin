@@ -36,11 +36,6 @@ token_delete :: proc() {
 
 }
 
-// Checks if the token file exists and if so, where it is.
-token_find :: proc() {
-
-}
-
 // Conducts the following checks:
 // 0. Checks if `opm` directory exists.             Response: creates directory + file containing "none"
 // 1. Checks if .OPM_TOKEN file exists              Response: creates file containing "none"
