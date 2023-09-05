@@ -24,16 +24,34 @@ token_help :: proc() {
 // Sets the file contents to the given input.
 token_set :: proc(token: string) {
     conduct_token_checks()
+
+    file, err := os.open(TOKEN_FILE)
+    if err != os.ERROR_NONE {
+        fmt.printf("Error: failed to open token file (%v)\n", err)
+        return
+    }
+
+    n := 0
+    n, err = os.write_string(file, token)
+
+    if err != os.ERROR_NONE {
+        fmt.printf("Error: write to token file was unsuccessful (%v)\n", err)
+        return
+    } else {
+        fmt.printf("Success: wrote %d/%d bytes!\n", n, len(token))
+    }
 }
 
 // Displays the token stored in the file.
 token_show :: proc() {
     conduct_token_checks()
+
 }
 
 // Replaces token file contents with "none".
 token_delete :: proc() {
     conduct_token_checks()
+
 }
 
 // Conducts the following checks:
