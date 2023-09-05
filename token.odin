@@ -11,6 +11,25 @@ when ODIN_OS == .Windows {
     TOKEN_FILE := fmt.aprintf("%s/%s", os.get_env("HOME"), ".config/opm/.OPM_TOKEN")
 }
 
+token :: proc() {
+    if len(os.args) < 3 {
+        token_help()
+        return
+    }
+    
+    switch os.args[2] {
+        case "set": 
+        if len(os.args) < 4 { 
+            fmt.println("Usage: opm token set [TOKEN]")
+        } else { 
+            token_set(os.args[3]) 
+        }
+        case "show": token_show()
+        case "delete": token_delete()
+        case: token_help()
+    }
+}
+
 // Shows specific help menu for `opm token` subcommands.
 token_help :: proc() {
     fmt.println("Usage: opm token [subcommand] [value]\n")
