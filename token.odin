@@ -22,25 +22,73 @@ token_help :: proc() {
 }
 
 // Sets the file contents to the given input.
-token_set :: proc(token string) {
-
+token_set :: proc(token: string) {
+    conduct_token_checks()
 }
 
 // Displays the token stored in the file.
 token_show :: proc() {
-
+    conduct_token_checks()
 }
 
 // Replaces token file contents with "none".
 token_delete :: proc() {
-
+    conduct_token_checks()
 }
 
 // Conducts the following checks:
-// 0. Checks if `opm` directory exists.             Response: creates directory + file containing "none"
+// 0. Checks if `opm` directory exists              Response: creates directory + file containing "none"
 // 1. Checks if .OPM_TOKEN file exists              Response: creates file containing "none"
-// 2. Checks if .OPM_TOKEN file contains anything   Response: informs the user
+// 2. Checks if .OPM_TOKEN file contains nothing    Response: adds "none"
 // NOTE: recoveries are priorised over panics/errors. A warning should be given as to what recovery was taken.
 conduct_token_checks :: proc() {
+    directory := TOKEN_FILE[:len(TOKEN_FILE)-11]
+    fmt.println(directory)
+
+    if !os.exists(directory) {
+        err := os.make_directory(directory)
+        if err != os.ERROR_NONE {
+            fmt.printf("Error: unexpected error whilest recovering opm directory (%v)\n", err)
+            return
+        }
+
+    } else if !os.is_dir(directory) {
+        err := os.remove(directory)
+        if err != os.ERROR_NONE {
+            fmt.printf("Error: unexpected error whilest removing phantom opm directory (%v, file?: %v)\n", err, os.is_file(directory))
+            return
+        }
+
+        err = os.make_directory(directory)
+        if err != os.ERROR_NONE {
+            fmt.printf("Error: unexpected error whilest recovering opm directory (%v)\n", err)
+            return
+        }
+    }
+
+    if !os.exists(TOKEN_FILE) {
+        res := os.write_entire_file(TOKEN_FILE, []u8{'n','o','n','e'})
+        if !res {
+            fmt.println("Error: token file recovery was not successful")
+            return
+        }
+
+    } else if !os.is_file(TOKEN_FILE) {
+        // Delete "TOKEN_FILE", create file
+        res := os.write_entire_file(TOKEN_FILE, []u8{'n','o','n','e'})
+        if !res {
+            fmt.println("Error: token file recovery was not successful")
+            return
+        }
+    } 
+
+    data, res := os.read_entire_file(TOKEN_FILE);defer delete(data)
     
+    if !res {
+        fmt.println("Warning: unable to read token file contents... This may impact other functions!")
+    } else {
+        if string(data) == "none" {
+            fmt.println("Warning: no token was found... This may impact other functions!")
+        }
+    }
 }
