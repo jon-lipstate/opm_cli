@@ -4,11 +4,11 @@ import "core:os"
 import "core:fmt"
 
 when ODIN_OS == .Windows {
-	TOKEN_FILE := "%APPDATA%\\opm\\.OPM_TOKEN"
+    TOKEN_FILE := fmt.aprintf("%s\\%s", os.get_env("%APP_DATA%"), "opm\\.OPM_TOKEN")
 } else when ODIN_OS == .Darwin {
-    TOKEN_FILE := "~/Library/Application Support/opm/.OPM_TOKEN"
+    TOKEN_FILE := fmt.aprintf("%s/%s", os.get_env("HOME"), "Library/Application Support/opm/.OPM_TOKEN")
 } else when ODIN_OS == .Linux {
-    TOKEN_FILE := "~/.config/opm/.OPM_TOKEN"
+    TOKEN_FILE := fmt.aprintf("%s/%s", os.get_env("HOME"), ".config/opm/.OPM_TOKEN")
 }
 
 // Shows specific help menu for `opm token` subcommands.
