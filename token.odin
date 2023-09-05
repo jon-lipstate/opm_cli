@@ -60,6 +60,11 @@ token_show :: proc() {
 token_delete :: proc() {
     conduct_token_checks()
 
+    res := os.write_entire_file(TOKEN_FILE, []u8{'n','o','n','e'})
+    if !res {
+        fmt.println("Error: could not write bytes to token file")
+        return
+    }
 }
 
 // Conducts the following checks:
