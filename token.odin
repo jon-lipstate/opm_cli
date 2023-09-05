@@ -46,6 +46,14 @@ token_set :: proc(token: string) {
 token_show :: proc() {
     conduct_token_checks()
 
+    contents, res := os.read_entire_file(TOKEN_FILE);defer delete(contents)
+
+    if !res {
+        fmt.println("Error: could not read token file")
+        return
+    }
+
+    fmt.println(contents)
 }
 
 // Replaces token file contents with "none".
