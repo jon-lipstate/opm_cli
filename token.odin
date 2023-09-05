@@ -93,7 +93,6 @@ token_delete :: proc() {
 // NOTE: recoveries are priorised over panics/errors. A warning should be given as to what recovery was taken.
 conduct_token_checks :: proc() {
     directory := TOKEN_FILE[:len(TOKEN_FILE)-11]
-    fmt.println(directory)
 
     if !os.exists(directory) {
         err := os.make_directory(directory)
