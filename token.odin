@@ -72,7 +72,7 @@ token_show :: proc() {
         return
     }
 
-    fmt.println(contents)
+    fmt.printf("token: %s\n", string(contents))
 }
 
 // Replaces token file contents with "none".
