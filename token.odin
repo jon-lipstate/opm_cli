@@ -16,7 +16,7 @@ token_help :: proc() {
     fmt.println("Usage: opm token [subcommand] [value]\n")
     fmt.println("[subcommands]")
     fmt.println("opm token set [TOKEN]\t\t<-- saves token for publication")
-    fmt.println("opm token show\t\t<-- displays saved token")
+    fmt.println("opm token show\t\t\t<-- displays saved token")
     fmt.println("opm token delete\t\t<-- deletes saved token")
     fmt.println("\nFor a full list of commands please type `opm`")
 }
