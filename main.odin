@@ -8,10 +8,18 @@ import "core:os"
 // import "core:os/os2"
 import "core:path/filepath"
 import "core:c/libc"
+import "core:log"
 
 USE_TRACKING_ALLOCATOR :: false
+USE_DEBUG_LOGGING :: false
 
 main :: proc() {
+	when USE_DEBUG_LOGGING {
+		context.logger = log.create_console_logger(log.Level.Debug)
+	} else {
+		context.logger = log.create_console_logger(log.Level.Fatal)
+	}
+
 	when !USE_TRACKING_ALLOCATOR {
 		_main()
 	} else {
@@ -25,6 +33,7 @@ main :: proc() {
 }
 
 _main :: proc() {
+
 	if len(os.args) < 2 {
 		fmt.println("OPM Commands:")
 		fmt.println("`opm publish` - publish the current directory")
