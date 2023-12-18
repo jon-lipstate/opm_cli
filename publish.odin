@@ -6,10 +6,7 @@ import "core:strings"
 import "core:os"
 import "core:path/filepath"
 import "core:c/libc"
-
-when ODIN_OS == .Windows {
-	import "./external/command"
-}
+import "./external/command"
 
 UserPkg :: struct {
 	url:          string,

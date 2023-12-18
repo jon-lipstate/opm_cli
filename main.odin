@@ -25,9 +25,6 @@ main :: proc() {
 }
 
 _main :: proc() {
-	publish()
-	if true do return
-
 	switch len(os.args) {
 	case 1:
 		fmt.println("OPM Commands:")
@@ -67,7 +64,7 @@ _main :: proc() {
 						break
 					}
 				}
-				data := strings.join(lines, "\n");delete(data)
+				data := strings.join(lines, "\n"); defer delete(data)
 				h, e := os.open(bashrc_path, os.O_RDWR, 0o644)
 				os.seek(h, 0, os.SEEK_SET)
 				os.write_string(h, data)
